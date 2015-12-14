@@ -1,6 +1,6 @@
 # ss-rpc-server
 
-RPC server for using Racket as Emacs extension language
+RPC server for using Racket as Emacs extension language.
 
 
 
