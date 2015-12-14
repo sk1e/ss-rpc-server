@@ -70,7 +70,6 @@
 
 
 
-
 (define vector-exit (box 42))
 (define (vector-exit? v) (eq? v vector-exit))
 
