@@ -13,7 +13,7 @@
 
 
 (provide define-method
-         register-method
+         register-method!
          serve!
          call
          call!
@@ -57,12 +57,15 @@
 (define method-ht (make-hasheq))
 (define (method? x) (hash-has-key? method-ht x))
 (define (get-method key) (hash-ref method-ht key))
-(define (register-method x key) (hash-set! method-ht key x))
+
+(define/contract (register-method! x key)
+  (-> procedure? symbol? void?)
+  (hash-set! method-ht key x))
 
 (define-syntax-rule (define-method (id . rest) body ...)
   (begin
-      (define (id . rest) body ...)
-    (register-method id 'id)))
+    (define (id . rest) body ...)
+    (register-method! id 'id)))
 
 
 
@@ -70,28 +73,28 @@
 
 (define vector-exit (box 42))
 (define (vector-exit? v) (eq? v vector-exit))
-(define (make-nil-readtable replacer)
-  (make-readtable (current-readtable)
-                  #\n 'non-terminating-macro (λ (c in . _)
+
+(define server-readtable
+  (make-parameter
+   (make-readtable (current-readtable)
+                   #\n 'non-terminating-macro (λ (c in . _)
+                                                 (match (read in)
+                                                   ['il null]
+                                                   [x (string->symbol (format "n~a" x))]))
+                   #\[ 'terminating-macro (λ (c in . _)
+                                             (list->vector
+                                              (let loop ()
                                                 (match (read in)
-                                                  ['il replacer]
-                                                  [x (string->symbol (format "n~a" x))]))
-                  #\[ 'terminating-macro (λ (c in . _)
-                                            (list->vector
-                                             (let loop ()
-                                               (match (read in)
-                                                 [(? vector-exit? _) '()]
-                                                 [x (cons x (loop))]))))
-                  #\] 'terminating-macro (λ (c in . _)
-                                            vector-exit)
-                  #\s 'dispatch-macro (λ (c in . _)
-                                         (match (read in)
-                                           [(list _ ... ':test test _ ... 'data (list kv ...))
-                                            (apply (case test
-                                                     [(eq) hasheq]
-                                                     [(eql equal) hash])
-                                                   kv)]
-                                           [x (raise-syntax-error #f "expected emacs lisp hash table syntax" x)]))))
+                                                  [(? vector-exit? _) '()]
+                                                  [x (cons x (loop))]))))
+                   #\] 'terminating-macro (λ (c in . _)
+                                             vector-exit)
+                   #\s 'dispatch-macro (λ (c in . _)
+                                          (match (read in)
+                                            [(list _ ... 'data (list kv ...))
+                                             (apply hash kv)]
+                                            [x (raise-syntax-error #f "expected emacs lisp hash table syntax" x)])))))
+
 
 
 
@@ -108,8 +111,7 @@
 (define (exit? x) (eq? x 'exit))
 
 (define/contract (serve! #:log-level [log-level 'info]
-                         #:log-out [log-out (current-output-port)]
-                         #:port [port #f])
+                         #:log-out [log-out (current-output-port)])
   (->* () (#:log-level (or/c 'none 'fatal 'error 'warning 'info 'debug)
                        #:log-out output-port?) void?)
   
@@ -153,25 +155,27 @@
   ((failed-call-pusher proc args) e))
 
 
-(define (call proc . args)
-  (with-handlers ([exn:fail? (server-fail-handler proc args)]
-                  [exit? (failed-call-pusher proc args)])
-    (send-list! (list 'call proc args))
+(define/contract (call method . args)
+  (->* (symbol?) #:rest (listof any/c) any/c)
+  (with-handlers ([exn:fail? (server-fail-handler method args)]
+                  [exit? (failed-call-pusher method args)])
+    (send-list! (list 'call method args))
     (handle-r-re-c-cv)))
 
 
-(define (call! proc . args)
-  (with-handlers ([exn:fail? (server-fail-handler proc args)]
-                  [exit? (failed-call-pusher proc args)])
-    (send-list! (list 'call-void proc args))
+(define/contract (call! method . args)
+  (->* (symbol?) #:rest (listof any/c) void?)
+  (with-handlers ([exn:fail? (server-fail-handler method args)]
+                  [exit? (failed-call-pusher method args)])
+    (send-list! (list 'call-void method args))
     (handle-rv-re-c-cv!)))
 
 
     
-(define ss-rpc-readtable (make-nil-readtable null))
+
 
 (define (get-message)
-  (define message (parameterize ([current-readtable ss-rpc-readtable])
+  (define message (parameterize ([current-readtable (server-readtable)])
                     (read in)))
   (log-ss-rpc-debug "received ~a" message)
   message)
@@ -180,8 +184,8 @@
 
 (define (handle-c-cv-t!)
   (match (get-message)
-    [(list 'call proc args) (handle-call! proc args)]
-    [(list 'call-void proc args) (handle-call-void! proc args)]
+    [(list 'call method args) (handle-call! method args)]
+    [(list 'call-void method args) (handle-call-void! method args)]
     [(list 'terminate) (raise 'terminate)]
     [x (raise-message-error "call | call-void | terminate" x)]))
 
@@ -189,12 +193,12 @@
 
 (define (handle-re-c-cv message handler error-prefix)
   (match message
-    [(list 'call proc args)
-     (handle-call! proc args)
+    [(list 'call method args)
+     (handle-call! method args)
      (handler)]
     
-    [(list 'call-void proc args)
-     (handle-call-void! proc args)
+    [(list 'call-void method args)
+     (handle-call-void! method args)
      (handler)]
     
     [(list 'return-error x) (handle-error x)]
@@ -245,4 +249,6 @@
 (define (handle-error message)
   (log-ss-rpc-error message)
   (raise 'exit))
+
+
 
