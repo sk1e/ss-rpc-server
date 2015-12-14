@@ -17,8 +17,8 @@
          serve!
          call
          call!
-         on-terminate)
-
+         on-terminate
+         server-readtable)
 
 
 
@@ -108,7 +108,9 @@
 (define-values (in out) (values #f #f))
 
 (define on-terminate (make-parameter void))
-(define (exit? x) (eq? x 'exit))
+
+(define exit (box 1))
+(define (exit? x) (eq? x exit))
 
 (define/contract (serve! #:log-level [log-level 'info]
                          #:log-out [log-out (current-output-port)])
@@ -135,7 +137,7 @@
                                                    (send-list! '(exit)))])
       (let loop ()
         (with-handlers ([exn:fail? log-server-error]
-                        [(λ (x) (eq? x 'exit)) (λ _ (log-ss-rpc-debug "exit to handle-c-cv-t! loop"))])
+                        [exit?  (λ _ (log-ss-rpc-debug "exit to handle-c-cv-t! loop"))])
           (handle-c-cv-t!))
         (loop))))
 
@@ -145,10 +147,9 @@
 
 
 
-;; todo raise exn struct or box instead of 'exit
 (define ((failed-call-pusher proc args)  _)
   (log-ss-rpc-error "SERVER->CLIENT CALL STACK: ~a ~a" proc args)
-  (raise 'exit))
+  (raise exit))
 
 (define ((server-fail-handler proc args) e)
   (log-server-error e)
@@ -215,7 +216,7 @@
 (define (handle-rv-re-c-cv!)
   (match (get-message)
     [(list 'return-void) (void)]
-    [x (handle-re-c-cv x handle-rv-re-c-cv! "return")]))
+    [x (handle-re-c-cv x handle-rv-re-c-cv! "return-void")]))
 
 
 
@@ -229,7 +230,7 @@
   (define em (format "server procedure application error:\n~a" (exn->string e)))
   (log-ss-rpc-error em)
   (send-list! (list 'return-error em))
-  (raise 'exit))
+  (raise exit))
 
 
 
@@ -248,7 +249,7 @@
 
 (define (handle-error message)
   (log-ss-rpc-error message)
-  (raise 'exit))
+  (raise exit))
 
 
 
