@@ -2,7 +2,7 @@
 
 
 (define collection "ss-rpc-server")
-(define scribblings '(("main.scrbl" ())))
+(define scribblings '(("ss-rpc-server.scrbl" ())))
 
 (define deps '("base" "srfi-lite-lib" "web-server-lib" ))
 

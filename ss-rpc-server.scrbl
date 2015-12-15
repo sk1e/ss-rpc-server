@@ -84,3 +84,4 @@ which are defined by the intersection of Emacs Lisp and Racket readers.
 
 @defparam[server-readtable x readtable? #:value readtable?]{
  Readtable to read incoming message. Currently reads nil symbol as empty list, elisp vectors and hashtables}
+
