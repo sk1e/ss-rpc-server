@@ -1,4 +1,4 @@
-(require 'ss-rpc)
+(require 'ss-rpc-client)
 
 
 (setq example-server (ss:start-server
