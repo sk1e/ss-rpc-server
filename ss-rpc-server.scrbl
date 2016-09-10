@@ -66,7 +66,7 @@ which are defined by the intersection of Emacs Lisp and Racket readers.
 @defproc[(call [method symbol?] [arg any/c] ...) any/c]{
                                                                 
   Applies a elisp procedure @racket[method] to @racket[arg]s as its arguments and returns the result
-        of application. Note, that elisp client does not registers remote procedures and @racket[method] can be any
+        of application. On elisp side ss-rpc does not registers remote procedures and @racket[method] can be any
         elisp procedure symbol.}
 
 
@@ -74,7 +74,7 @@ which are defined by the intersection of Emacs Lisp and Racket readers.
 @defproc[(call! [method symbol?] [arg any/c] ...) void?]{
                                                                 
   Applies a elisp procedure @racket[method] to @racket[arg]s as its arguments with @bold["ignoring"] the return result
-        of application. Note, that elisp client does not registers remote procedures and @racket[method] can be any
+        of application. On elisp side ss-rpc does not registers remote procedures and @racket[method] can be any
         elisp procedure symbol.}
 
 
