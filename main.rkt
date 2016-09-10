@@ -6,10 +6,10 @@
          racket/match
          racket/string
          racket/tcp
+         racket/logging
+         racket/exn
          
-         srfi/19
-         
-         web-server/private/util)
+         srfi/19)
 
 
 (provide define-method
@@ -113,8 +113,7 @@
 
 (define/contract (serve! #:log-level [log-level 'info]
                          #:log-out [log-out (current-output-port)])
-  (->* () (#:log-level (or/c 'none 'fatal 'error 'warning 'info 'debug)
-                       #:log-out output-port?) void?)
+  (->* () (#:log-level log-level/c  #:log-out output-port?) void?)
   
   (init-logger (make-log-receiver ss-rpc-logger log-level)
                log-out)
